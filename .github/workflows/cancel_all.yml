@@ -1,0 +1,49 @@
+name: 取消所有工作流
+on:
+  workflow_dispatch:
+
+jobs:
+  cancel-workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel all in-progress workflows
+        run: |
+          workflows=(
+            "ace2.yml"
+            "ace2pro.yml"
+            "ace3.yml"
+            "ace3Pro.yml"
+            "ace3v.yml"
+            "ace5.yml"
+            "ace5pro整合.yml"
+            "acePro.yml"
+            "OnePlus11.yml"
+            "oneplus12.yml"
+            "oneplus12r.yml"
+            "oneplus13整合.yml"
+            "oneplus13t整合.yml"
+            "padpro.yml"
+          )
+
+          for wf in "${workflows[@]}"; do
+            echo "Checking and cancelling any in-progress runs of $wf..."
+
+            workflow_id=$(curl -s -H "Authorization: Bearer ${{ secrets.PAT }}" \
+              https://api.github.com/repos/${{ github.repository }}/actions/workflows \
+              | jq ".workflows[] | select(.path == \".github/workflows/$wf\") | .id")
+
+            if [ -z "$workflow_id" ]; then
+              echo "⚠️ Warning: Cannot find workflow ID for $wf"
+              continue
+            fi
+
+            run_ids=$(curl -s -H "Authorization: Bearer ${{ secrets.PAT }}" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/workflows/$workflow_id/runs?status=in_progress" \
+              | jq ".workflow_runs[] | select(.head_branch==\"main\") | .id")
+
+            for run_id in $run_ids; do
+              echo "Cancelling run $run_id of $wf..."
+              curl -s -X POST -H "Authorization: Bearer ${{ secrets.PAT }}" \
+                "https://api.github.com/repos/${{ github.repository }}/actions/runs/$run_id/cancel"
+            done
+          done
